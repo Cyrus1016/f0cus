@@ -64,6 +64,20 @@
   .task input::placeholder{ color:var(--sub) }
   .task input:focus{ border-bottom-color:var(--fg) }
 
+  .dayline{ position:fixed; left:50%; transform:translateX(-50%); width:min(560px, calc(100% - 44px)); bottom:calc(126px + env(safe-area-inset-bottom)); z-index:1; pointer-events:none }
+  .dayline .track{ position:relative; height:10px; border-radius:999px; background:var(--dot); overflow:visible; transition:background var(--t) }
+  .dayline .block{ position:absolute; top:0; height:100%; border-radius:999px; background:var(--dot-on); min-width:3px; transition:background var(--t) }
+  .dayline .block.brk{ background:var(--dot-on); opacity:.35 }
+  .dayline .block.live{ animation:breathe 2s ease-in-out infinite }
+  @keyframes breathe{ 50%{ opacity:.55 } }
+  .dayline .now{ position:absolute; top:-4px; width:2px; height:18px; background:var(--fg); border-radius:1px; transition:background var(--t) }
+  .dayline .ticks{ display:flex; justify-content:space-between; font-size:11px; color:var(--sub); margin-top:6px; transition:color var(--t) }
+  @media (max-height:640px){ .dayline{ display:none } }
+  .today{ position:fixed; left:0; right:0; bottom:calc(96px + env(safe-area-inset-bottom)); text-align:center; font-size:14px; color:var(--sub); display:flex; justify-content:center; gap:10px; transition:color var(--t); pointer-events:none; z-index:1 }
+  .today b{ font-weight:600; color:var(--fg); transition:color var(--t) }
+  .today .sep{ opacity:.5 }
+  @media (max-height:560px){ .today{ display:none } }
+
   /* ---------- ripple on phase change ---------- */
   .ripple{ z-index:5; position:fixed; left:50%; top:50%; width:20px; height:20px; border-radius:50%; transform:translate(-50%,-50%) scale(0); pointer-events:none; z-index:5; opacity:.9 }
   .ripple.go{ animation:rip .9s cubic-bezier(.2,.7,.3,1) forwards }
@@ -93,17 +107,12 @@
   .bar .track{ flex:1; width:100%; max-width:36px; border-radius:999px; background:var(--wash); position:relative; overflow:hidden }
   .bar .fill{ position:absolute; bottom:0; left:0; right:0; border-radius:999px; background:var(--green); transition:height .4s ease }
   .bar label{ font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100% }
-  .actions{ display:flex; gap:10px; margin:16px 0 22px; flex-wrap:wrap }
-  .chip{ background:var(--wash); color:var(--green); border:0; border-radius:12px; padding:12px 16px; font-size:13px; display:grid; gap:6px; place-items:center; min-width:96px }
-  .chip svg{ width:18px; height:18px }
   h3{ font-size:17px; font-weight:600; margin:18px 0 10px }
   .rows{ background:#F6F8F7; border-radius:12px; overflow:hidden }
   .row{ display:flex; justify-content:space-between; padding:14px 18px; font-size:15px; border-top:1px solid #E7ECEA }
   .row:first-child{ border-top:0 }
   .row .r{ color:var(--ink) }
   .row small{ color:var(--muted) }
-  .list .row{ align-items:center }
-  .empty{ color:var(--muted); font-size:14px; padding:14px 18px }
   .pill{ font-size:12px; padding:2px 8px; border-radius:999px; background:var(--green-soft); color:var(--green-deep) }
   .pill.b{ background:var(--wash); color:var(--muted) }
 
@@ -148,6 +157,15 @@
     </div>
     <div class="task"><input id="task" placeholder="What are you working on?" maxlength="60"></div>
   </div>
+  <div class="dayline" id="dayline" aria-label="Today's focus sessions on a 24 hour timeline">
+    <div class="track" id="dayTrack"><div class="now" id="dayNow"></div></div>
+    <div class="ticks"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>12am</span></div>
+  </div>
+  <div class="today" id="today" aria-live="polite">
+    <span><b id="todayHours">0h 0m</b> focused today</span>
+    <span class="sep">·</span>
+    <span><b id="todayFlows">0</b> sessions</span>
+  </div>
 </section>
 
 <!-- ===== STATS ===== -->
@@ -158,20 +176,13 @@
       <button data-r="D" aria-pressed="false">D</button><button data-r="W" aria-pressed="true">W</button><button data-r="M" aria-pressed="false">M</button><button data-r="Y" aria-pressed="false">Y</button>
     </div>
   </div>
-  <p class="big" id="bigStat">0 <small>Flows</small></p>
+  <p class="big" id="bigStat">0 <small>Sessions</small></p>
   <div class="nav"><button id="prev" aria-label="Previous">&#8249;</button><span id="rangeLabel"></span><button id="next" aria-label="Next">&#8250;</button></div>
   <div class="chart" id="chart"></div>
-  <div class="actions">
-    <button class="chip" id="showSessions"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/></svg>Sessions</button>
-    <button class="chip" id="exportCsv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4m0 0l-4 4m4-4l4 4M5 14v5a1 1 0 001 1h12a1 1 0 001-1v-5"/></svg>Export CSV</button>
-    <button class="chip" id="exportIcs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>To calendar</button>
-  </div>
-  <h3>Flows</h3>
+  <h3>Focus</h3>
   <div class="rows" id="flowRows"></div>
   <h3>Breaks</h3>
   <div class="rows" id="breakRows"></div>
-  <h3 id="sessionsTitle" style="display:none">Sessions</h3>
-  <div class="rows list" id="sessionList" style="display:none"></div>
 </section>
 
 <!-- ===== SETTINGS ===== -->
@@ -198,16 +209,7 @@
     <div class="field"><div class="l">Desktop notifications</div><button class="sw" role="switch" aria-checked="false" id="notif"></button></div>
     <div class="field"><div class="l">Preview chimes</div><button class="link" id="preview">Play</button></div>
   </div>
-  <h3>Calendar</h3>
-  <div class="rows">
-    <div class="field"><div class="l">Sync completed focus sessions<small>Downloads an .ics file each time a focus session finishes. Open it to add the block to your calendar.</small></div><button class="sw" role="switch" aria-checked="false" id="calSync"></button></div>
-    <div class="field"><div class="l">Calendar event title<small>Uses the task name when one is set</small></div><input type="text" id="calTitle" style="font:inherit;font-size:15px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:150px;color:var(--ink);background:#fff"></div>
-  </div>
-  <h3>Data</h3>
-  <div class="rows">
-    <div class="field"><div class="l">Sessions stored<small id="storedCount">0</small></div><button class="link danger" id="clear">Clear history</button></div>
-  </div>
-  <p class="note">Space starts and pauses. R resets. Left and right arrows move between pages. Data stays on this device.</p>
+  <p class="note">Space starts and pauses. R resets. Left and right arrows move between pages. Everything is stored on this device.</p>
 </section>
 
 <div class="ripple" id="ripple"></div>
@@ -235,11 +237,11 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const MODES = { focus:'Focus', short:'Break', long:'Long break' };
 
   // ----- state -----
-  const defaults = { focus:25, short:5, long:15, rounds:4, autoBreak:true, autoFocus:false, sound:true, volume:70, ticks:false, notif:false, calSync:false, calTitle:'Focus session' };
+  const defaults = { focus:25, short:5, long:15, rounds:4, autoBreak:true, autoFocus:false, sound:true, volume:70, ticks:false, notif:false };
   let S = { ...defaults };
   let sessions = [];        // {type,start,end,planned,completed,task}
   let mode='focus', running=false, endAt=0, remaining=0, tick=null, round=0, startedAt=0, lastTick=-1;
-  let range='W', offset=0, metric='count', showList=false;
+  let range='W', offset=0, metric='count';
 
   // ----- storage -----
   async function load(){
@@ -256,7 +258,31 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const total = () => S[mode]*60*1000;
   const fmt = ms => { const s=Math.max(0,Math.ceil(ms/1000)); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 
+  function renderDayline(d0){
+    const track = $('dayTrack'); const DAY = 86400000;
+    track.querySelectorAll('.block').forEach(b => b.remove());
+    const add = (start, end, cls) => {
+      const l = Math.max(0, (start-d0)/DAY*100), r = Math.min(100, (end-d0)/DAY*100);
+      if (r <= l) return;
+      const b = document.createElement('div'); b.className = 'block '+cls; b.style.left = l+'%'; b.style.width = (r-l)+'%';
+      track.insertBefore(b, $('dayNow'));
+    };
+    sessions.forEach(s => { if (s.end>=d0) add(s.start, s.end, s.type==='focus' ? '' : 'brk'); });
+    if (startedAt && startedAt>=d0) add(startedAt, startedAt + (total()-remaining), (mode==='focus' ? '' : 'brk') + (running ? ' live' : ''));
+    $('dayNow').style.left = ((Date.now()-d0)/DAY*100)+'%';
+  }
+  function renderToday(){
+    const d0 = dayStart(new Date()).getTime();
+    let ms = 0, flows = 0;
+    sessions.forEach(s => { if (s.type==='focus' && s.start>=d0){ ms += s.end-s.start; if (s.completed) flows++; } });
+    if (mode==='focus' && startedAt && startedAt>=d0) ms += total() - remaining;   // time consumed in the session in progress
+    const m = Math.floor(ms/60000);
+    $('todayHours').textContent = `${Math.floor(m/60)}h ${m%60}m`;
+    renderDayline(d0);
+    $('todayFlows').textContent = flows;
+  }
   function renderTimer(){
+    renderToday();
     document.body.classList.toggle('running', running);
     $('time').textContent = fmt(remaining);
     $('phase').textContent = MODES[mode];
@@ -287,7 +313,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   function logSession(completed){
     if (!startedAt) return;
     sessions.push({ type:mode, start:startedAt, end:Date.now(), planned:S[mode], completed, task:$('task').value.trim() });
-    if (completed && mode==='focus' && S.calSync) downloadIcs([sessions[sessions.length-1]], 'focus-session.ics');
     startedAt = 0;
   }
 
@@ -375,46 +400,24 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     const vals = new Array(b.labels.length).fill(0);
     flows.filter(s=>s.completed).forEach(s => { const k=b.keyOf(s.start); if (k<vals.length) vals[k] += metric==='count' ? 1 : mins(s); });
     const totalV = vals.reduce((a,c)=>a+c,0), max = Math.max(1,...vals);
-    $('bigStat').innerHTML = metric==='count' ? `${totalV} <small>Flows</small>` : `${Math.floor(totalV/60)}h ${totalV%60}m <small>focused</small>`;
+    $('bigStat').innerHTML = metric==='count' ? `${totalV} <small>Sessions</small>` : `${Math.floor(totalV/60)}h ${totalV%60}m <small>focused</small>`;
     $('rangeLabel').textContent = b.title;
     const chart = $('chart'); chart.innerHTML = '';
-    vals.forEach((v,i) => { const d=document.createElement('div'); d.className='bar'; d.innerHTML=`<div class="track"><div class="fill" style="height:${v?Math.max(8,v/max*100):0}%"></div></div><label>${b.labels[i]}</label>`; d.title=`${v} ${metric==='count'?'flows':'min'}`; chart.appendChild(d); });
+    vals.forEach((v,i) => { const d=document.createElement('div'); d.className='bar'; d.innerHTML=`<div class="track"><div class="fill" style="height:${v?Math.max(8,v/max*100):0}%"></div></div><label>${b.labels[i]}</label>`; d.title=`${v} ${metric==='count'?'sessions':'min'}`; chart.appendChild(d); });
     chart.style.gap = vals.length>12 ? '3px' : '8px';
     const rows = (arr) => `<div class="row"><span>Started</span><span class="r">${arr.length}</span></div><div class="row"><span>Completed</span><span class="r">${arr.filter(s=>s.completed).length}</span></div><div class="row"><span>Minutes</span><span class="r">${arr.reduce((a,s)=>a+mins(s),0).toLocaleString()}</span></div>`;
     $('flowRows').innerHTML = rows(flows); $('breakRows').innerHTML = rows(breaks);
-    $('sessionsTitle').style.display = showList ? '' : 'none'; $('sessionList').style.display = showList ? '' : 'none';
-    if (showList){
-      const list = [...inRange].reverse();
-      $('sessionList').innerHTML = list.length ? list.map(s => `<div class="row"><span>${new Date(s.start).toLocaleString(undefined,{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}<br><small>${s.task||MODES[s.type]}</small></span><span style="text-align:right">${mins(s)} min<br><span class="pill ${s.type==='focus'?'':'b'}">${s.completed?MODES[s.type]:'Skipped'}</span></span></div>`).join('') : '<div class="empty">No sessions in this period yet.</div>';
-    }
-    $('storedCount').textContent = `${sessions.length} sessions`;
   }
-
-  // ----- export -----
-  function download(name, text, type){ const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([text],{type})); a.download=name; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }
-  function exportCsv(){
-    const b=buckets(); const rows=sessions.filter(s=>s.start>=b.from&&s.start<b.to);
-    const csv=['type,start,end,minutes,completed,task', ...rows.map(s=>[s.type,new Date(s.start).toISOString(),new Date(s.end).toISOString(),mins(s),s.completed,`"${(s.task||'').replace(/"/g,'""')}"`].join(','))].join('\n');
-    download('focus-sessions.csv', csv, 'text/csv');
-  }
-  const icsDate = t => new Date(t).toISOString().replace(/[-:]/g,'').replace(/\.\d{3}/,'');
-  function downloadIcs(rows, name){
-    const ev = rows.map((s,i)=>`BEGIN:VEVENT\nUID:focus-${s.start}-${i}@local\nDTSTAMP:${icsDate(Date.now())}\nDTSTART:${icsDate(s.start)}\nDTEND:${icsDate(s.end)}\nSUMMARY:${(s.task||S.calTitle||'Focus session').replace(/[,;]/g,' ')}\nEND:VEVENT`).join('\n');
-    download(name, `BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Focus//EN\n${ev}\nEND:VCALENDAR`, 'text/calendar');
-  }
-  function exportIcs(){ const b=buckets(); const rows=sessions.filter(s=>s.type==='focus'&&s.completed&&s.start>=b.from&&s.start<b.to); if (!rows.length) return alert('No completed focus sessions in this period.'); downloadIcs(rows,'focus-sessions.ics'); }
 
   // ----- settings binding -----
   function bindSettings(){
     ['focus','short','long','rounds'].forEach(k => { const el=$('s'+k[0].toUpperCase()+k.slice(1)); el.value=S[k]; el.onchange=()=>{ S[k]=Math.min(+el.max,Math.max(+el.min,parseInt(el.value)||defaults[k])); el.value=S[k]; if (round>=S.rounds) round=0; if (!running) remaining=total(); save(); renderTimer(); }; });
-    ['autoBreak','autoFocus','sound','ticks','notif','calSync'].forEach(k => { const el=$(k); el.setAttribute('aria-checked', S[k]); el.onclick=async()=>{ S[k]=!S[k]; if (k==='notif'&&S[k]&&'Notification' in window&&Notification.permission!=='granted'){ const p=await Notification.requestPermission(); if (p!=='granted') S[k]=false; } el.setAttribute('aria-checked',S[k]); save(); }; });
+    ['autoBreak','autoFocus','sound','ticks','notif'].forEach(k => { const el=$(k); el.setAttribute('aria-checked', S[k]); el.onclick=async()=>{ S[k]=!S[k]; if (k==='notif'&&S[k]&&'Notification' in window&&Notification.permission!=='granted'){ const p=await Notification.requestPermission(); if (p!=='granted') S[k]=false; } el.setAttribute('aria-checked',S[k]); save(); }; });
     const vol=$('volume'); const paintVol=()=>{ vol.style.setProperty('--pct', S.volume+'%'); $('volLabel').textContent = S.volume===0 ? 'Muted' : S.volume+'%'; };
     vol.value=S.volume; paintVol();
     vol.oninput=()=>{ S.volume=+vol.value; paintVol(); };
     vol.onchange=()=>{ save(); if (S.sound) try { tone(660,0,.3); } catch(e){} };
-    $('calTitle').value=S.calTitle; $('calTitle').onchange=e=>{ S.calTitle=e.target.value.trim()||defaults.calTitle; save(); };
     $('preview').onclick=()=>{ chime('short'); setTimeout(()=>chime('focus'),1400); setTimeout(()=>chime('long'),2600); };
-    $('clear').onclick=()=>{ if (confirm('Delete all stored sessions?')){ sessions=[]; round=0; save(); renderStats(); renderTimer(); } };
   }
 
   // ----- navigation -----
@@ -428,8 +431,6 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   $('metric').onchange=e=>{ metric=e.target.value; renderStats(); };
   document.querySelectorAll('#range button').forEach(b=>b.onclick=()=>{ range=b.dataset.r; offset=0; document.querySelectorAll('#range button').forEach(x=>x.setAttribute('aria-pressed',x===b)); renderStats(); });
   $('prev').onclick=()=>{ offset--; renderStats(); }; $('next').onclick=()=>{ if (offset<0) offset++; renderStats(); };
-  $('showSessions').onclick=()=>{ showList=!showList; renderStats(); };
-  $('exportCsv').onclick=exportCsv; $('exportIcs').onclick=exportIcs;
   document.addEventListener('keydown',e=>{
     if (['INPUT','SELECT'].includes(e.target.tagName)) return;
     if (e.code==='Space'){ e.preventDefault(); ac(); running?pause():start(); }
@@ -438,6 +439,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     if (e.key==='ArrowRight'){ const i=pages.findIndex(p=>$(p).classList.contains('active')); go(pages[Math.min(2,i+1)]); }
   });
 
+  setInterval(() => { if (!running) renderToday(); }, 60000);
   load();
 })();
 </script>
