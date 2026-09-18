@@ -67,7 +67,6 @@
   .dayline{ position:fixed; left:50%; transform:translateX(-50%); width:min(560px, calc(100% - 44px)); bottom:calc(126px + env(safe-area-inset-bottom)); z-index:1; pointer-events:none }
   .dayline .track{ position:relative; height:10px; border-radius:999px; background:var(--dot); overflow:visible; transition:background var(--t) }
   .dayline .block{ position:absolute; top:0; height:100%; border-radius:999px; background:var(--dot-on); min-width:3px; transition:background var(--t) }
-  .dayline .block.brk{ background:var(--dot-on); opacity:.35 }
   .dayline .block.live{ animation:breathe 2s ease-in-out infinite }
   @keyframes breathe{ 50%{ opacity:.55 } }
   .dayline .now{ position:absolute; top:-4px; width:2px; height:18px; background:var(--fg); border-radius:1px; transition:background var(--t) }
@@ -259,16 +258,20 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   const fmt = ms => { const s=Math.max(0,Math.ceil(ms/1000)); return `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`; };
 
   function renderDayline(d0){
-    const track = $('dayTrack'); const DAY = 86400000;
+    const track = $('dayTrack'); const DAY = 86400000, GAP = 30*60000;   // bridge pauses shorter than 30 min
     track.querySelectorAll('.block').forEach(b => b.remove());
-    const add = (start, end, cls) => {
-      const l = Math.max(0, (start-d0)/DAY*100), r = Math.min(100, (end-d0)/DAY*100);
+    const ivs = sessions.filter(s => s.end>=d0).map(s => [s.start, s.end]);
+    if (startedAt && startedAt>=d0) ivs.push([startedAt, startedAt + (total()-remaining)]);
+    ivs.sort((a,b) => a[0]-b[0]);
+    const spans = [];
+    ivs.forEach(([a,b]) => { const last = spans[spans.length-1]; if (last && a - last[1] <= GAP) last[1] = Math.max(last[1], b); else spans.push([a,b]); });
+    spans.forEach(([a,b], k) => {
+      const l = Math.max(0, (a-d0)/DAY*100), r = Math.min(100, (b-d0)/DAY*100);
       if (r <= l) return;
-      const b = document.createElement('div'); b.className = 'block '+cls; b.style.left = l+'%'; b.style.width = (r-l)+'%';
-      track.insertBefore(b, $('dayNow'));
-    };
-    sessions.forEach(s => { if (s.end>=d0) add(s.start, s.end, s.type==='focus' ? '' : 'brk'); });
-    if (startedAt && startedAt>=d0) add(startedAt, startedAt + (total()-remaining), (mode==='focus' ? '' : 'brk') + (running ? ' live' : ''));
+      const el = document.createElement('div'); el.className = 'block' + (running && k===spans.length-1 ? ' live' : '');
+      el.style.left = l+'%'; el.style.width = (r-l)+'%';
+      track.insertBefore(el, $('dayNow'));
+    });
     $('dayNow').style.left = ((Date.now()-d0)/DAY*100)+'%';
   }
   function renderToday(){
